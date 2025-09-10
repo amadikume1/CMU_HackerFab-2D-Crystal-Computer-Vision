@@ -8,6 +8,9 @@ cursor = database.cursor()
 
 # Will interpret data as basic list.
 
+information = [["Wafer1", "Graphene", "Triangle", 10, 10, "GREEN", 150, 180],
+               ["Wafer2", "Graphene", "Square", 15, 14, "GREEN", 100, 12]]
+
 cursor.execute('''CREATE TABLE IF NOT EXISTS substrate (
                
                id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,7 +19,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS substrate (
                Shape TEXT,
                Size_Width REAL,
                Size_Height REAL,
-               Color REAL,
+               Color TEXT,
                Position_X REAL,
                Position_Y REAL
 
@@ -24,7 +27,9 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS substrate (
     )
 
 
-cursor.execute("INSERT INTO substrate (Wafer_ID, Material, Shape) VALUES (?, ?, ?)", ("Wafer1","Graphene", "Triangle",))
+
+for entry in information:
+    cursor.execute(f"INSERT INTO substrate (Wafer_ID, Material, Shape, Size_Width, Size_Height, Color, Position_X, Position_Y) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (entry[0],entry[1], entry[2], entry[3], entry[4],entry[5], entry[6], entry[7],))
 
 
 cursor.execute("SELECT * FROM substrate")
