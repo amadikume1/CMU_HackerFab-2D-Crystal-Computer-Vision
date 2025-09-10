@@ -11,6 +11,7 @@ cursor = database.cursor()
 cursor.execute('''CREATE TABLE IF NOT EXISTS substrate (
                
                id INTEGER PRIMARY KEY AUTOINCREMENT,
+               Wafer_ID TEXT,
                Material TEXT,
                Shape TEXT,
                Size_Width REAL,
@@ -23,7 +24,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS substrate (
     )
 
 
-cursor.execute("INSERT INTO substrate (Material) VALUES (?)", ("Graphene",))
+cursor.execute("INSERT INTO substrate (Wafer_ID, Material, Shape) VALUES (?, ?, ?)", ("Wafer1","Graphene", "Triangle",))
 
 
 cursor.execute("SELECT * FROM substrate")
