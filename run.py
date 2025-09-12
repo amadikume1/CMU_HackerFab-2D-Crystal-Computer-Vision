@@ -1,6 +1,8 @@
-from helper import Shannon_Entropy, Entropy_Mask, Threshold_Pass, Threshold
+from helper import Shannon_Entropy, Entropy_Mask, Threshold_Pass, Threshold, save_stage, extract_shape_features
 import cv2
 import numpy as np
+import os, sqlite3, json
+from datetime import datetime
 
 
 ## Entropy Mask Pipeline
@@ -13,29 +15,20 @@ HSV_image = cv2.cvtColor(base_rgb_image, cv2.COLOR_BGR2HSV) #HSV
 # grayscale_image = cv2.cvtColor(HSV_image, cv2.COLOR_BGR2GRAY)  #Grayscale
 grayscale_image = cv2.cvtColor(base_rgb_image, cv2.COLOR_BGR2GRAY)
 
-cv2.imshow("Entropy_Filterd_mask", grayscale_image)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+#cv2.imshow("Entropy_Filterd_mask", grayscale_image)
+save_stage(grayscale_image, "outputs", "plate7", "gray")
+#cv2.waitKey(0)
+#cv2.destroyAllWindows()
 
 
 ## Edge Detection Pipeline
 
-edge_detection =  cv2.Canny(grayscale_image, 5, 12, apertureSize=3)
-# sobel_x = cv2.Sobel(grayscale_image, cv2.CV_64F, 1, 0, ksize=3)
-# sobel_y = cv2.Sobel(grayscale_image, cv2.CV_64F, 0, 1, ksize=3)
-# sobel_edges = np.uint8(np.sqrt(sobel_x**2 + sobel_y**2) > 50) * 255
-# edge_detection = cv2.bitwise_or(edge_detection, sobel_edges)
-# Apply closing
-# kernel_sizes = [1, 1, 2, 2]
-# for size in kernel_sizes:
-#     edge_detection = cv2.morphologyEx(edge_detection, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (size, size)))
+edge_detection = cv2.Canny(grayscale_image, 5, 12, apertureSize=3)
 edge_detection = cv2.dilate(edge_detection, np.ones((2,2), np.uint8), iterations=1)
-#edge_detection = cv2.morphologyEx(edge_detection, cv2.MORPH_CLOSE, np.ones((2,2), np.uint8), iterations=2)
 
 original_filled = np.zeros_like(edge_detection)
 Detected_Regions = cv2.findContours(edge_detection, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 cv2.drawContours(original_filled, Detected_Regions[0], -1, 255, -1)
-
 Entropy_Filterd_mask = Entropy_Mask(edge_detection, Detected_Regions, grayscale_image)
 
 scale_factor = 0.8
@@ -49,12 +42,15 @@ edge_resized = cv2.resize(edge_detection, (new_width, new_height))
 filled_resized = cv2.resize(original_filled, (new_width, new_height))
 entropy_resized = cv2.resize(Entropy_Filterd_mask, (new_width, new_height))
 
-cv2.imshow("Gray", gray_resized)
-cv2.imshow("edge", edge_resized)
-cv2.imshow("Filled", filled_resized)
-cv2.imshow("Entropy_Filterd_mask", entropy_resized)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+#cv2.imshow("Gray", gray_resized)
+#cv2.imshow("edge", edge_resized)
+save_stage(edge_detection, "outputs", "plate7", "edges")
+#cv2.imshow("Filled", filled_resized)
+save_stage(filled_resized, "outputs", "plate7", "filled")
+#cv2.imshow("Entropy_Filterd_mask", entropy_resized)
+save_stage(Entropy_Filterd_mask, "outputs", "plate7", "entropy_mask")
+#cv2.waitKey(0)
+#cv2.destroyAllWindows()
 
 
 ## Thresholding Pipeline
@@ -83,12 +79,47 @@ test_res = cv2.bitwise_and(closed, Entropy_Filterd_mask)
 resized = cv2.resize(closed, (new_width, new_height))
 resized2 = cv2.resize(test_res, (new_width, new_height))
 
-cv2.imshow("Threshold_mask", resized)
-cv2.imshow("Threshold_mask", resized2)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+#cv2.imshow("Threshold_mask", resized)
+#cv2.imshow("Threshold_mask", resized2)
+save_stage(Threshold_mask, "outputs", "plate7", "threshold_mask")
+#cv2.waitKey(0)
+#cv2.destroyAllWindows()
     
+"""
+input: already thresholded image
+output: optical microscope images, positions of the XY stage and objective lens, and shape features in SQL database form
+"""
 
+# Extract shape features from the final mask
+shape_features = extract_shape_features(test_res)
+for f in shape_features:              # f is one dict
+    for feature, value in f.items():  # iterate its key:value pairs
+        print(feature, value)
+    print("----")
 
+# Save results to SQLite database
+conn = sqlite3.connect('results.db')
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS results
+                (timestamp TEXT, area REAL, perimeter REAL, circularity REAL, aspect_ratio REAL,
+                centroid_x REAL, centroid_y REAL, bbox_x INTEGER, bbox_y INTEGER, bbox_w INTEGER, bbox_h INTEGER)
+''')
 
+for feature in shape_features:
+    c.execute('''INSERT INTO results (timestamp, area, perimeter, circularity, aspect_ratio,
+                centroid_x, centroid_y, bbox_x, bbox_y, bbox_w, bbox_h)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+                    datetime.utcnow().isoformat(),
+                    feature.get("area"),
+                    feature.get("perimeter"),
+                    feature.get("circularity"),
+                    feature.get("aspect_ratio"),
+                    feature.get("centroid_x"),
+                    feature.get("centroid_y"),
+                    feature.get("bbox_x"),
+                    feature.get("bbox_y"),
+                    feature.get("bbox_w"),
+                    feature.get("bbox_h"),
+                ))
 
+conn.commit()
