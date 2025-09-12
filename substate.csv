@@ -1,0 +1,3 @@
+id,Wafer_ID,Material,Shape,Size_Width,Size_Height,Color,Position_X,Position_Y
+1,Wafer1,Graphene,Triangle,10.0,10.0,GREEN,150.0,180.0
+2,Wafer2,Graphene,Square,15.0,10.0,GREEN,150.0,180.0
