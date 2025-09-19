@@ -3,18 +3,17 @@ import cv2
 import numpy as np
 import os, time
 
-def extract_shape_features(binary_image, gray_image=None):
+def extract_shape_features(binary_image, color_image=None):
     """
-    Extract shape features from a binary (0/255) mask.
-    
+    Extract shape and color features from a binary (0/255) mask.
+
     Args:
         binary_image (np.ndarray): Single-channel binary image (0 background, 255 foreground).
-        gray_image (np.ndarray, optional): Grayscale image for entropy calculation.
-    
+        color_image (np.ndarray, optional): Color image (BGR) to estimate region color.
+
     Returns:
         list[dict]: list of shape feature dictionaries, one per contour.
     """
-    # Find contours of thresholded regions
     cnts, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     features = []
@@ -22,44 +21,60 @@ def extract_shape_features(binary_image, gray_image=None):
         area = cv2.contourArea(cnt)
         if area <= 0:
             continue
+
         perimeter = cv2.arcLength(cnt, True)
 
         x, y, w, h = cv2.boundingRect(cnt)
-        aspect = w / h if h > 0 else 0
-
-        hull = cv2.convexHull(cnt)
-        hull_area = cv2.contourArea(hull)
-        solidity = area / hull_area if hull_area > 0 else 0
-
-        circularity = 4 * np.pi * area / (perimeter**2) if perimeter > 0 else 0
 
         M = cv2.moments(cnt)
         cx = M["m10"] / M["m00"] if M["m00"] != 0 else x + w / 2
         cy = M["m01"] / M["m00"] if M["m00"] != 0 else y + h / 2
 
-        # Optional: entropy of region
-        entropy = None
-        if gray_image is not None:
-            roi = gray_image[y:y+h, x:x+w]
-            if roi.size > 0:
-                vals, counts = np.unique(roi, return_counts=True)
-                probs = counts / counts.sum()
-                entropy = -np.sum(probs * np.log2(probs))
+        # ---- Shape detection by polygon approximation ----
+        approx = cv2.approxPolyDP(cnt, 0.04 * perimeter, True)
+        sides = len(approx)
 
+        if sides == 3:
+            shape_name = "Triangle"
+        elif sides == 4:
+            aspect_ratio = float(w) / h if h > 0 else 0
+            shape_name = "Square" if 0.95 <= aspect_ratio <= 1.05 else "Rectangle"
+        elif sides == 5:
+            shape_name = "Pentagon"
+        elif sides > 5:
+            shape_name = "Circle"
+        else:
+            shape_name = "Unknown"
+
+        # ---- Color detection if color image is available ----
+        color_name = "Unknown"
+        if color_image is not None:
+            mask = np.zeros(binary_image.shape, dtype=np.uint8)
+            cv2.drawContours(mask, [cnt], -1, 255, -1)  # fill contour
+            mean_color = cv2.mean(color_image, mask=mask)[:3]  # BGR tuple
+
+            b, g, r = mean_color
+            if r > g and r > b:
+                color_name = "RED"
+            elif g > r and g > b:
+                color_name = "GREEN"
+            elif b > r and b > g:
+                color_name = "BLUE"
+            elif abs(r-g) < 15 and abs(g-b) < 15:
+                color_name = "GRAY"
+            else:
+                color_name = "MIXED"
+
+        # ---- Save features ----
         features.append({
-            "idx": idx,
-            "area": float(area),
-            "perimeter": float(perimeter),
-            "aspect_ratio": float(aspect),
-            "solidity": float(solidity),
-            "circularity": float(circularity),
-            "centroid_x": float(cx),
-            "centroid_y": float(cy),
-            "bbox_x": int(x),
-            "bbox_y": int(y),
-            "bbox_w": int(w),
-            "bbox_h": int(h),
-            "entropy": float(entropy) if entropy is not None else None,
+            "Wafer_ID": f"Auto_{idx}",       # placeholder
+            "Material": "placeholder",       # still unknown
+            "Shape": shape_name,
+            "Size_Width": float(w),
+            "Size_Height": float(h),
+            "Color": color_name,
+            "Position_X": float(cx),
+            "Position_Y": float(cy)
         })
 
     return features

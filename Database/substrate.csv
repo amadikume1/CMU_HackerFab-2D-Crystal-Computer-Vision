@@ -1,0 +1,6 @@
+id,Wafer_ID,Material,Shape,Size_Width,Size_Height,Color,Position_X,Position_Y
+1,Auto_0,placeholder,Square,3.0,3.0,Unknown,286.0,408.0
+2,Auto_1,placeholder,Circle,11.0,16.0,Unknown,251.61818181818182,378.56161616161614
+3,Auto_2,placeholder,Pentagon,5.0,6.0,Unknown,226.94949494949495,342.7474747474747
+4,Wafer1,Graphene,Triangle,10.0,10.0,GREEN,150.0,180.0
+5,Wafer2,Graphene,Square,15.0,10.0,GREEN,150.0,180.0

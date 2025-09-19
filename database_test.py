@@ -4,8 +4,6 @@ database = sq.connect("Database/substrate_database")
 
 cursor = database.cursor()
 
-
-
 # Will interpret data as basic list.
 
 information = [["Wafer1", "Graphene", "Triangle", 10, 10, "GREEN", 150, 180],
@@ -38,10 +36,10 @@ rows = cursor.fetchall()
 header = []
 
 for head in cursor.description:
-    print(head)
+    # print(head)
     header.append(head[0])
 
-with open('substate.csv', 'w', newline='') as f:
+with open('Database/substrate.csv', 'w', newline='') as f:
 
     write = csv.writer(f)
 

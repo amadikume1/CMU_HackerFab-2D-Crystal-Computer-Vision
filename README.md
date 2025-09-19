@@ -15,6 +15,9 @@ Clone the repository and install dependencies:
 ### Usage
 Run the main script with an input image:
 `python run.py`
+Then, the denoised graphene images will be saved in the `outputs/` directory and the extracted shape features will be saved in `Database/substrate_database`. To obtain the database of substrate features, run:
+`python database_test.py`
+The database will be saved as `substrate.csv` in the `Database/` directory.
 
 ### (In the future) Neural Network Training
 To train and test the neural network, use the training script:
