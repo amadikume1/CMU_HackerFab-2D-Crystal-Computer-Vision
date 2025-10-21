@@ -71,7 +71,7 @@ save_stage(Threshold_mask, "Output_images", "plate7", "threshold_mask")
 
 """Extract shape features from the final mask"""
 
-shape_features = extract_shape_features(test_res)
+shape_features = extract_shape_features(test_res, base_rgb_image)
 
 # Connect to existing substrate database
 conn = sqlite3.connect("Database/substrate_database")
