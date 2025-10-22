@@ -1,157 +1,189 @@
+"""
+simulate_reflectance_TMM.py
+------------------------------------------------------------
+Author: Amadi Ume
+Last Updated: [insert date]
+
+Purpose:
+    Simulate the optical color of a graphene-on-SiO₂/Si substrate
+    using the Transfer Matrix Method (TMM). This reproduces
+    the MaskTerial thin-film color model, combining physical
+    interference simulation with Gaussian-fitted illumination
+    and camera sensitivity curves.
+
+Use case:
+    - Validate substrate color for a given SiO₂ thickness
+    - Evaluate apparent graphene contrast
+    - Generate physically accurate synthetic data
+
+Dependencies:
+    numpy, matplotlib, opencv (for mask generation)
+    create_mask.py (provides spatial layer mask)
+    data/rgb_gauss_fit.json
+    data/spectrum_gauss_fit.json
+------------------------------------------------------------
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
-from T import *
-import cv2 
-def calculate_reflectance_TMM(M_total, n_incident=1.0, n_substrate=3.5+0.01j):
-    
- 
-    # Extract matrix elements
+import json
+from create_mask import *
+import cv2
+
+
+# Gaussian-based Illumination and Camera Modeling(From Paper)
+
+def gauss(x, mu, sigma):
+    """Single Gaussian function."""
+    return np.exp(-((x - mu) ** 2) / (2 * sigma**2)) / (sigma * np.sqrt(2 * np.pi))
+
+def gauss_fit_5(
+    x,
+    pi1, mu1, sigma1,
+    pi2, mu2, sigma2,
+    pi3=0, mu3=1, sigma3=1,
+    pi4=0, mu4=1, sigma4=1,
+    pi5=0, mu5=1, sigma5=1,
+    c=0,
+):
+    """Five-component Gaussian mixture — identical to MaskTerial."""
+    return (
+        pi1 * gauss(x, mu1, sigma1)
+        + pi2 * gauss(x, mu2, sigma2)
+        + pi3 * gauss(x, mu3, sigma3)
+        + pi4 * gauss(x, mu4, sigma4)
+        + pi5 * gauss(x, mu5, sigma5)
+        + c
+    )
+
+def load_camera_activation(path, wavelengths):
+    """Load RGB camera response (from rgb_gauss_fit.json)."""
+    with open(path, "r") as f:
+        rgb_params = json.load(f)
+    r = gauss_fit_5(wavelengths, **rgb_params["r"])
+    g = gauss_fit_5(wavelengths, **rgb_params["g"])
+    b = gauss_fit_5(wavelengths, **rgb_params["b"])
+    return np.stack((r, g, b), axis=0)  # shape (3, W): R,G,B
+
+def load_spectrum(path, wavelengths):
+    """Load illumination spectrum (from spectrum_gauss_fit.json)."""
+    with open(path, "r") as f:
+        spectrum_params = json.load(f)
+    return gauss_fit_5(wavelengths, **spectrum_params)
+
+
+
+# Core Optical Physics: Transfer Matrix Method (TMM) 
+
+def calculate_reflectance_TMM(M_total, n_incident=1.0, n_substrate=3.88 + 0.02j):
+    """Compute reflectance R = |r|² from total characteristic matrix."""
     M11, M12 = M_total[0, 0], M_total[0, 1]
     M21, M22 = M_total[1, 0], M_total[1, 1]
-    
-    # Calculate reflection coefficient with boundary conditions
-    numerator = (n_incident * M11 + n_incident * n_substrate * M12 - M21 - n_substrate * M22)
-    denominator = (n_incident * M11 + n_incident * n_substrate * M12 + M21 + n_substrate * M22)
-    
+
+    numerator = (n_incident * M11 + n_incident * n_substrate * M12
+                 - M21 - n_substrate * M22)
+    denominator = (n_incident * M11 + n_incident * n_substrate * M12
+                   + M21 + n_substrate * M22)
     r = numerator / denominator
-    
-    # Reflectance is |r|²
-    R = np.abs(r)**2
-    
-    return R
-    
-    
+    return np.abs(r) ** 2
+
+
 def create_Matrix(wavelength, ni, ti):
-  
-    internals = (2 * np.pi * ni * ti) / wavelength
-    
+    """Construct characteristic matrix for one thin-film layer."""
+    # Convert wavelength to meters for unit consistency
+    w_m = wavelength * 1e-9
+    phase = (2 * np.pi * ni * ti) / w_m
+    cos = np.cos(phase)
+    sin = np.sin(phase)
+    return np.array([[cos, (1j * sin) / ni],
+                     [1j * ni * sin, cos]])
 
-    cos = np.cos(internals)
-    sin = np.sin(internals)
-    
-    # Build the 2x2 characteristic matrix
-    Mi = np.array([
-        [cos,  (1j * sin) / ni],
-        [1j * ni * sin,  cos]
-    ])
-    
-    return Mi
-    
-def TMM_reflectance(wavelength, ref_index, thickness, is_material, is_background, g_layers):
-    ni_air, ni_silicon, ni_SIO2, ni_material = ref_index
-    ti_air, ti_silicon, ti_SIO2, ti_material = thickness
-    ti_material *= g_layers
 
+def TMM_reflectance(wavelength, ref_index, thickness,
+                    is_material, is_background, g_layers):
+    """Compute wavelength-dependent reflectance for multilayer stack."""
+    n_air, n_si, n_sio2, n_g = ref_index
+    t_air, t_si, t_sio2, t_g = thickness
+    t_g *= g_layers
     wavelength = np.atleast_1d(wavelength)
-    R_values = []  # IMPORTANT: Store all wavelengths
-    
+    R_values = []
+
     if is_material:
         for w in wavelength:
-            M_material = create_Matrix(w, ni_material, ti_material)
-            M_SIO2 = create_Matrix(w, ni_SIO2, ti_SIO2)
-            M_total = np.dot(M_material, M_SIO2)  # Graphene first, then SiO2
-            R = calculate_reflectance_TMM(M_total, ni_air, ni_silicon)
-            R_values.append(R)
-        return np.array(R_values)
-
+            M_g = create_Matrix(w, n_g, t_g)
+            M_sio2 = create_Matrix(w, n_sio2, t_sio2)
+            M_total = np.dot(M_g, M_sio2)
+            R_values.append(calculate_reflectance_TMM(M_total, n_air, n_si))
     elif is_background:
         for w in wavelength:
-            M_SIO2 = create_Matrix(w, ni_SIO2, ti_SIO2)
-            R = calculate_reflectance_TMM(M_SIO2, ni_air, ni_silicon)
-            R_values.append(R)
-        return np.array(R_values)
-    
-wavelength = np.linspace(380, 780, 401)
+            M_sio2 = create_Matrix(w, n_sio2, t_sio2)
+            R_values.append(calculate_reflectance_TMM(M_sio2, n_air, n_si))
 
-ref_index = [1.0, 3.5+0.01j, 1.46, 3.0+1.3j]  # [air, Si, SiO2, graphene]
-thickness = [np.inf, np.inf, 285e-9, 0.34e-9]   # [air, Si, SiO2, graphene]
+    return np.array(R_values)
 
-R = TMM_reflectance(wavelength, ref_index, thickness, True, False, 1)
+
+# Simulation Parameters 
+
+wavelength = np.linspace(380, 780, 401)  # nm range
+ref_index = [1.0, 3.88 + 0.02j, 1.46, 2.6 + 1.3j]  # realistic indices
+thickness = [np.inf, np.inf, 90e-9, 0.34e-9]      # 285 nm oxide
+
+
+# Reflectance Spectrum to Pixel Color 
 
 def pixel_reflectance(pixel_value, ref_index, thickness):
-    """Calculate reflectance spectrum for a pixel - pass ALL wavelengths at once"""
+    """Return reflectance spectrum depending on pixel mask."""
     if pixel_value != 0:
         return TMM_reflectance(wavelength, ref_index, thickness, True, False, pixel_value)
     else:
         return TMM_reflectance(wavelength, ref_index, thickness, False, True, pixel_value)
 
+# Load Illumination & Camera Spectra (from JSON)
 
-H, W = 512, 512
+illumination_path = "data/spectrum_gauss_fit.json"
+camera_path = "data/rgb_gauss_fit.json"
 
-mask = create_mask(H, W)
+Illumination_spectrum = load_spectrum(illumination_path, wavelength)
+RGB_channel = load_camera_activation(camera_path, wavelength)
 
-
-Illumination_array_mu = np.array([446.34, 448.29, 530.7, 577.1])
-Illumination_array_pi = np.array([7.71, 20.09, 13.22, 69.22])
-Illumination_array_sigma = np.array([6.98, 15.01, 22.45, 49.95])
-Illumination_array_c = np.array([-0.0])
-
-
-# --- Blue channel ---
-RGB_array_b_mu = np.array([453.64, 482.32, 605.0])
-RGB_array_b_pi = np.array([61.7, 4.81, -19.39])
-RGB_array_b_sigma = np.array([41.69, 19.84, 64.21])
-RGB_array_b_c = np.array([0.14])
-
-# --- Green channel ---
-RGB_array_g_mu = np.array([390.29, 488.26, 516.14, 569.29, 653.64])
-RGB_array_g_pi = np.array([108.74, 13.56, 39.37, 87.48, 15.61])
-RGB_array_g_sigma = np.array([134.16, 14.93, 24.27, 37.22, 22.32])
-RGB_array_g_c = np.array([-0.28])
-
-# --- Red channel ---
-RGB_array_r_mu = np.array([367.84, 525.26, 588.49, 609.13, 646.75])
-RGB_array_r_pi = np.array([-7.42, -1.8, 13.52, 21.11, 48.58])
-RGB_array_r_sigma = np.array([-31.83, -13.53, 11.78, 16.38, 25.12])
-RGB_array_r_c = np.array([0.03])
-
-
-Illumination_spectrum = 0
-Red_channel = 0
-Green_channel = 0
-Blue_channel = 0
-
-def Gaussian(mean, standard_dev, amplitude, wavelength):
-    fraction = 1 / (abs(standard_dev) * np.sqrt(2 * np.pi))
-    exp_term = np.exp(-((wavelength - mean)**2) / (2 * standard_dev**2))  # No 1e9 conversion!
-    return amplitude * fraction * exp_term
-
-
-for i in range(len(Illumination_array_mu)):
-    Illumination_spectrum += Gaussian(Illumination_array_mu[i], Illumination_array_sigma[i], Illumination_array_pi[i], wavelength)
-
-for i in range(len(RGB_array_r_mu)):
-    Red_channel += Gaussian(RGB_array_r_mu[i], RGB_array_r_sigma[i], RGB_array_r_pi[i], wavelength)
-
-for i in range(len(RGB_array_g_mu)):
-    Green_channel += Gaussian(RGB_array_g_mu[i], RGB_array_g_sigma[i], RGB_array_g_pi[i], wavelength)
-
-for i in range(len(RGB_array_b_mu)):
-    Blue_channel += Gaussian(RGB_array_b_mu[i], RGB_array_b_sigma[i], RGB_array_b_pi[i], wavelength)
-
-
-Illumination_spectrum += Illumination_array_c[0]
-Red_channel += RGB_array_r_c[0]
-Blue_channel += RGB_array_b_c[0]
-Green_channel += RGB_array_g_c[0]
-
-RGB_channel = [Red_channel,  Blue_channel, Green_channel]
+# Normalize each component
+Illumination_spectrum /= np.max(Illumination_spectrum)
+RGB_channel /= np.max(RGB_channel, axis=1, keepdims=True)
 
 
 
-def color_per_pixel(pixel_value, ref_index, thickness, Illumination_spectrum, RGB_channel, wavelength):
-    # Get reflectance spectrum (should be shape (401,))
+# Integrate Reflectance × Spectra → RGB 
+
+def color_per_pixel(pixel_value, ref_index, thickness,
+                    Illumination_spectrum, RGB_channel, wavelength):
+    """Integrate R(λ) × S(λ) × C_c(λ) dλ for each RGB channel."""
     Ref = pixel_reflectance(pixel_value, ref_index, thickness)
-    
-    # Use SUM instead of trapz, matching the paper
-    Red = np.sum((Ref * Illumination_spectrum) * RGB_channel[0])
-    Green = np.sum((Ref * Illumination_spectrum) * RGB_channel[1])
-    Blue = np.sum((Ref * Illumination_spectrum) * RGB_channel[2])
-    
-    return [Red, Green, Blue]
+    RGB = np.trapz(Ref * Illumination_spectrum * RGB_channel, wavelength, axis=1)
+    return RGB
 
 
-mask = create_mask(512, 512)
+# === Compute and Display SIO2 Substrate Color 
 
+background_rgb = color_per_pixel(
+    0, ref_index, thickness, Illumination_spectrum, RGB_channel, wavelength
+)
+background_rgb = np.array(background_rgb, dtype=float)
+background_rgb /= np.max(background_rgb)
 
+# --- Auto White Balance (Gray-world assumption) ---
+scene_gain = np.trapz(Illumination_spectrum * RGB_channel, wavelength, axis=1)
+wb_auto = 1.0 / np.maximum(scene_gain, 1e-12)
+wb_auto /= wb_auto.max()
+background_rgb *= wb_auto
+background_rgb = np.clip(background_rgb / np.max(background_rgb), 0, 1)
 
+# --- Gamma Correction ---
+background_rgb_gamma = background_rgb ** (1 / 2.2)
+
+print("Simulated SiO₂ substrate RGB (after white balance):", background_rgb_gamma)
+
+# --- Display ---
+plt.imshow([[background_rgb_gamma]])
+plt.axis("off")
+plt.title("Simulated SiO₂ Background Color")
+plt.show()
