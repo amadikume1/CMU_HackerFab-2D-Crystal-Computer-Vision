@@ -112,14 +112,11 @@ Processed Output (results/denoise/)
 Database/substrate_database/
 ```
 
-[Placeholder for visual diagram: “Baseline vs Diffusion Denoised Pipeline”]
-
 ---
 
 ## Contributors
 - **Xiaoqi Wu** — Diffusion denoising, integration, testing, and analysis  
 - **Amadi Ume** — Graphene dataset generation and YOLOv8 detection  
-- **Christina** — Data preprocessing, configuration tuning, and pipeline documentation  
 - **Hacker Fab Team @ Carnegie Mellon University**
 
 ---
