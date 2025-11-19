@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html>
+  <head>
+
+    <style>
+
+        .pop_up-bar {
+
+            background-color: transparent;     
+            height: 100px;               
+            width: 100%;               
+            border-bottom: 3.3px solid #9c9999; 
+            border-radius: 10px;
+        }
+
+        .menu-bar {
+            background-color: rgb(193, 192, 192);     
+            height: 40px;               
+            width: 100%;               
+            border-bottom: 3.3px solid #9c9999; 
+            border-radius: 10px;
+        }
+
+
+        .menu-button {
+            background-color: transparent;   /* flat, no fill by default */
+            position: relative;
+            top: 3.5px;    /* moves it down (Y axis) */
+            left: 10px;  /* moves it right (X axis) */
+            border: none;                    /* no hard border */
+            color: #222;                     /* dark gray text instead of pure black */
+            font-family: 'Segoe UI', Roboto, sans-serif;  /* modern clean font */
+            font-size: 18px;
+            text-align: center;
+            padding: 5px 10px;
+            border-radius: 4px;              /* slightly rounded corners */
+            transition: background-color 0.2s ease, transform 1s ease; /* smooth hover */
+            cursor: pointer;
+        }
+
+        .menu-button:hover {
+        background-color: #e0e0e0;       /* soft gray hover */
+        padding: 5px 10px;
+        transform: translateY(-2px);     /* tiny upward lift on hover */
+        }
+
+
+        .payload-button {
+        background-color: rgb(255, 98, 98);   /* flat, no fill by default */
+        position: relative;
+        top: 10px;    /* moves it down (Y axis) */
+        left: 10px;  /* moves it right (X axis) */
+        height: 30px;               
+        width: 20%;   
+        border: none;                    /* no hard border */
+        color: #222;                     /* dark gray text instead of pure black */
+        font-family: 'Segoe UI', Roboto, sans-serif;  /* modern clean font */
+        font-size: 17px;
+        text-align: center;
+        padding: 5px 10px;
+        border-radius: 4px;              /* slightly rounded corners */
+        transition: background-color 0.2s ease, transform 1s ease; /* smooth hover */
+        cursor: pointer;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        
+        
+
+        .payload-button:hover {
+        background-color: #e0e0e0;      
+        padding: 5px 10px;
+        transform: translateY(-2px);     
+        }
+
+
+        .dropdown-content {
+            display: none;             
+            position: absolute;         
+            background-color: white;
+            min-width: 120px;
+            top: 45px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            z-index: 1;
+        }
+        
+
+        .dropdown::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        height: 10px; 
+        }
+
+        .dropdown {
+            position: relative;       
+            display: inline-block;    
+           
+        }
+
+        .dropdown-content a {
+            color: #333;
+            padding: 8px 12px;
+            text-decoration: none;
+            display: block;
+            font-size: 14px;
+        }
+
+        .dropdown-content a:hover {
+            background-color: #c2b7b7;
+        }
+
+        .dropdown:hover .dropdown-content {
+            
+            display: block;
+        }
+
+
+        .popup {
+            display: none;
+            position: fixed;
+            top: 150px;
+            left: 0;
+            width: 50%;
+            height: 50%;
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+      }
+
+
+      @keyframes slideFromRight {
+        from { transform: translateX(0%); opacity: 0; }
+        to   { transform: translateX(50%); opacity: 1; }
+        }
+
+    .slide-in {
+    animation: slideFromRight 0.5s ease-out forwards;
+    }
+
+
+
+
+    @keyframes slideOut {
+        from { transform: translateX(50%); opacity: 1; }
+        to   { transform: translateX(0%); opacity: 0; }
+        }
+
+    .slide-out {
+        animation: slideOut 0.5s ease-out backwards;
+    }
+
+
+
+
+    .mini-textbox {
+            background-color: #c2b7b7;
+            width: 100px;
+            height: 25px;
+            padding: 5px;
+            text-align: center;
+            top: 0px;
+            left: 200px;
+            font-size: 15px;
+            border: 1px solid #000000;
+            transition: background-color 0.2s ease, transform 1s ease;
+            border-radius: 4px;
+        }
+
+    .mini-textbox:hover {
+
+        background-color: #e0e0e0;       /* soft gray hover */
+        transform: translateY(-2px);     /* tiny upward lift on hover */
+    }
+
+
+
+    .units-button {
+            background-color: gray;   /* flat, no fill by default */
+            position: relative;
+            top: 3.5px;    /* moves it down (Y axis) */
+            left: 10px;  /* moves it right (X axis) */
+            border: none;                    /* no hard border */
+            color: #222;                     /* dark gray text instead of pure black */
+            font-family: 'Segoe UI', Roboto, sans-serif;  /* modern clean font */
+            font-size: 18px;
+            text-align: center;
+            padding: 5px 10px;
+            border-radius: 4px;              /* slightly rounded corners */
+            transition: background-color 0.2s ease, transform 1s ease; /* smooth hover */
+            cursor: pointer;
+        }
+    
+    .units-button:hover {
+
+        background-color: #e0e0e0;       /* soft gray hover */
+        transform: translateY(-2px);     /* tiny upward lift on hover */
+    }
+
+
+    .layers-panel {
+        position: fixed;
+        right: 20px;
+        top: 80px;
+        width: 250px;
+        max-height: 500px;
+        background-color: #2c2c2c;
+        border: 1px solid #666;
+        border-radius: 8px;
+        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3);
+        z-index: 100;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .layers-panel-header {
+        background-color: #1e1e1e;
+        color: #fff;
+        padding: 10px;
+        font-family: 'Segoe UI', Roboto, sans-serif;
+        font-size: 14px;
+        font-weight: bold;
+        border-bottom: 1px solid #666;
+    }
+
+    .shapes-selector {
+        background-color: #1e1e1e;
+        padding: 10px;
+        border-bottom: 1px solid #666;
+    }
+
+    .shape-select-dropdown {
+        width: 100%;
+        padding: 8px;
+        background-color: #383838;
+        color: #fff;
+        border: 1px solid #666;
+        border-radius: 4px;
+        font-family: 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .add-shape-btn {
+        width: 100%;
+        margin-top: 8px;
+        padding: 8px;
+        background-color: #0d7cd6;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-family: 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .add-shape-btn:hover {
+        background-color: #0b6ab8;
+    }
+
+    .layers-list {
+        overflow-y: auto;
+        flex: 1;
+        padding: 5px;
+    }
+
+    .layer-item {
+        background-color: #383838;
+        color: #fff;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px;
+        transition: background-color 0.2s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .layer-item:hover {
+        background-color: #4a4a4a;
+    }
+
+    .layer-item.selected {
+        background-color: #0d7cd6;
+    }
+
+    .layer-delete-btn {
+        background-color: #d64545;
+        border: none;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .layer-delete-btn:hover {
+        background-color: #ff6b6b;
+    }
+
+
+        /* Shape Settings Popup (Hidden by Default) */
+    /* Small floating shape settings panel (no overlay) */
+    .shape-settings-popup {
+        position: absolute;         /* small floating box */
+        display: none;              /* hidden until opened */
+        background-color: #2e2e2e;  
+        border: 1px solid #666;
+        border-radius: 8px;
+        padding: 12px;
+        width: 220px;
+        z-index: 5000;              /* above everything but not fullscreen */
+        box-shadow: 0px 4px 8px rgba(0,0,0,0.3);
+    }
+
+    /* Header */
+    .shape-settings-header {
+        font-family: 'Segoe UI', Roboto, sans-serif;
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+
+    /* Label */
+    .settings-label {
+        color: white;
+        font-family: 'Segoe UI', Roboto, sans-serif;
+        font-size: 12px;
+        margin-top: 6px;
+    }
+
+    /* Slider */
+    .settings-slider {
+        width: 100%;
+        margin-top: 4px;
+    }
+
+    /* Text boxes */
+    .settings-textbox {
+        width: 100%;
+        padding: 5px;
+        background-color: #444;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 4px;
+        margin-top: 4px;
+        font-size: 12px;
+    }
+
+    /* Apply button */
+    .settings-apply-btn {
+        margin-top: 10px;
+        width: 100%;
+        padding: 8px;
+        background-color: #0d7cd6;
+        border: none;
+        border-radius: 4px;
+        color: white;
+        cursor: pointer;
+        font-size: 13px;
+    }
+
+    .settings-apply-btn:hover {
+        background-color: #0b6ab8;
+    }
+
+
+
+     </style>
+
+  </head>
+
+
+  <body>
+
+
+     <div class="menu-bar">
+
+        <div class="dropdown">
+            <button class="menu-button">File</button>
+
+            <div class="dropdown-content">
+            <a id="newOption" href="#">New</a>
+            <a id="openOption" href="#">Open</a>
+            <a id="saveOption" href="#">Save</a>
+            </div>
+
+        </div>
+
+     </div>
+
+
+    <!-- Floating Layers Panel -->
+    <div class="layers-panel">
+        <div class="layers-panel-header">Layers</div>
+        
+        <div class="shapes-selector">
+            <select id="shapeSelect" class="shape-select-dropdown">
+                <option value="">Select a shape...</option>
+            </select>
+            <button id="addShapeBtn" class="add-shape-btn">Add Shape</button>
+        </div>
+
+        <div class="layers-list" id="layersList">
+            <!-- Layer items will be added here dynamically -->
+        </div>
+    </div>
+
+
+
+    <div id="popup" class="popup">
+
+        <div class = "pop_up-bar">
+
+            <button id = "upload_image" class = "payload-button"><b></b>Upload</button>
+            <button id = "create_button" class="payload-button" style="left: 150px; top: 310px;">Create</button>
+            <input id = "width" type="text" class="mini-textbox" style="position: absolute; left: 330px; top: 120px;" placeholder="Width">
+            <input id = "height" type="text" class="mini-textbox" style="position: absolute; left: 330px; top: 50px;" placeholder="Height">
+            
+        </div>
+
+    </div>
+
+
+
+        <!-- Shape Settings Popup -->
+    <div id="shapeSettingsPopup" class="shape-settings-popup">
+
+        <div class="shape-settings-window">
+
+            <div class="shape-settings-header">
+                Shape Settings
+            </div>
+
+            <div class="shape-settings-content">
+
+                <!-- Angle Slider -->
+                <label class="settings-label">Rotation Angle:</label>
+                <input id="shapeAngleSlider" type="range" min="0" max="360" value="0" class="settings-slider">
+
+                <!-- X position -->
+                <label class="settings-label">X Position:</label>
+                <input id="shapeXInput" type="text" class="settings-textbox" placeholder="Enter X">
+
+                <!-- Y position -->
+                <label class="settings-label">Y Position:</label>
+                <input id="shapeYInput" type="text" class="settings-textbox" placeholder="Enter Y">
+
+                <button id="applyShapeSettings" class="settings-apply-btn">Apply</button>
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+
+    
+
+  </body>
+
+
+  <script> 
+
+    const new_file = document.getElementById('newOption');
+    const popup = document.getElementById('popup');
+    const Create_button = document.getElementById('create_button');
+    var select_pop_up = false;
+    var canvas;
+    var screen;
+    var ctx;
+    const shape_popup = document.getElementById("shapeSettingsPopup");
+    
+
+   
+
+const polygonShapes = {
+    "Shape 1": [
+        [0.41666666, 0.6151013],
+        [0.42009804, 0.6151013],
+        [0.42009804, 0.6252302],
+        [0.42647058, 0.62891346],
+        [0.4372549, 0.63075507],
+        [0.425, 0.6058932],
+        [0.40980393, 0.5994475],
+        [0.40490195, 0.60865563],
+        [0.41666666, 0.6151013]
+    ],
+    "Shape 2": [[0.37745097, 0.34346226],
+                [0.375,      0.37200737],
+                [0.37843138, 0.3922652 ],
+                [0.39117646, 0.40515652],
+                [0.4,       0.43186003],
+                [0.422549, 0.4723757 ],
+                [0.43970588, 0.49815837],
+                [0.4495098,  0.50644565],
+                [0.46078432, 0.50092083],
+                [0.4627451,  0.47882137],
+                [0.4495098 , 0.4558011 ],
+                [0.44313726, 0.41804788],
+                [0.4372549 , 0.39963168],
+                [0.43088236 ,0.39502764],
+                [0.42352942, 0.3775322 ],
+                [0.41715688 ,0.36924493],
+                [0.40294117, 0.29281768],
+                [0.37843138, 0.30662984],
+                [0.3754902 , 0.32780847],
+                [0.3754902 , 0.33701658],
+                [0.37745097, 0.34346226]],
+
+                
+    "Shape 3": [[0.39117646 ,0.5       ],
+                [0.40098038 ,0.52209944],
+                [0.41568628 ,0.52209944],
+                [0.41470587 ,0.51289135],
+                [0.39117646 ,0.5       ]],
+
+    "Shape 4": [[0.39509803 ,0.75414366],
+                [0.4137255  ,0.72007364],
+                [0.39264706 ,0.713628  ],
+                [0.39509803 ,0.75414366]],
+
+    "Shape 5": [[0.44411764 ,0.5543278 ],
+                [0.42058823 ,0.5349908 ],
+                [0.40784314 ,0.53867406],
+                [0.40098038 ,0.548803  ],
+                [0.42058823 ,0.54972374],
+                [0.4406863  ,0.5589319 ],
+                [0.44411764 ,0.5543278 ]],
+
+    "Shape 6": [[0.41666666 ,0.6151013 ],
+                [0.42009804 ,0.6151013 ],
+                [0.42009804 ,0.6252302 ],
+                [0.42647058 ,0.62891346],
+                [0.4372549  ,0.63075507],
+                [0.425      ,0.6058932 ],
+                [0.40980393 ,0.5994475 ],
+                [0.40490195 ,0.60865563],
+                [0.41666666 ,0.6151013 ]]
+};
+
+let polygonInstances = [];
+let currentShapeIndex = 0; // To give each shape a unique ID
+let draggingPolygon = null; // Track which polygon is being dragged
+let selectedPolygon = null; // Track selected polygon
+
+// Polygon instance structure
+function createPolygonInstance(shapeName, points, x, y) {
+    return {
+        id: `Polygon_${currentShapeIndex++}`,
+        shapeName: shapeName,
+        points: points,
+        x: x,
+        y: y,
+        angle: 0
+    };
+}
+
+
+// Populate the shape selector dropdown
+function populateShapeSelector() {
+    const shapeSelect = document.getElementById('shapeSelect');
+    shapeSelect.innerHTML = '<option value="">Select a shape...</option>';
+    
+    for (let shapeName in polygonShapes) {
+        const option = document.createElement('option');
+        option.value = shapeName;
+        option.textContent = shapeName;
+        shapeSelect.appendChild(option);
+    }
+}
+
+populateShapeSelector();
+
+
+// Update the layers list display
+function updateLayersList() {
+    const layersList = document.getElementById('layersList');
+    layersList.innerHTML = '';
+    
+    polygonInstances.forEach((instance, index) => {
+        const layerItem = document.createElement('div');
+        layerItem.className = 'layer-item';
+        if (selectedPolygon && selectedPolygon.id === instance.id) {
+            layerItem.classList.add('selected');
+        }
+        
+        const layerName = document.createElement('span');
+        layerName.textContent = `${instance.shapeName} ${index + 1}`;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'layer-delete-btn';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            deletePolygon(instance.id);
+        };
+        
+        layerItem.appendChild(layerName);
+        layerItem.appendChild(deleteBtn);
+        
+        layerItem.onclick = () => {
+            selectPolygon(instance.id);
+        };
+        
+        layersList.appendChild(layerItem);
+    });
+}
+
+
+// Select a polygon
+function selectPolygon(polygonId) {
+
+    if (polygonId === null) {
+        selectedPolygon = null;
+        updateLayersList();
+        highlightSelectedPolygon();
+        return;
+    }
+
+    else {
+        selectedPolygon = polygonInstances.find(p => p.id === polygonId);
+        updateLayersList();
+        highlightSelectedPolygon();
+
+    }
+}
+
+
+// Highlight the selected polygon
+function highlightSelectedPolygon() {
+    polygonInstances.forEach(instance => {
+        const polygonElement = document.getElementById(instance.id);
+        if (polygonElement) {
+            if (selectedPolygon && instance.id === selectedPolygon.id) {
+                polygonElement.setAttribute('stroke', 'yellow');
+                polygonElement.setAttribute('stroke-width', '1');
+            } else {
+                polygonElement.setAttribute('stroke', 'red');
+                polygonElement.setAttribute('stroke-width', '1');
+            }
+        }
+    });
+}
+
+
+// Delete a polygon
+function deletePolygon(polygonId) {
+    const polygonElement = document.getElementById(polygonId);
+    if (polygonElement) {
+        polygonElement.remove();
+    }
+    
+    polygonInstances = polygonInstances.filter(p => p.id !== polygonId);
+    
+    if (selectedPolygon && selectedPolygon.id === polygonId) {
+        selectedPolygon = null;
+    }
+    
+    updateLayersList();
+}
+
+
+// Add shape button handler
+document.getElementById('addShapeBtn').addEventListener('click', function() {
+    const shapeSelect = document.getElementById('shapeSelect');
+    const shapeName = shapeSelect.value;
+    
+    if (shapeName && polygonShapes[shapeName]) {
+        const points = polygonShapes[shapeName];
+        const newInstance = createPolygonInstance(shapeName, points, 200, 200);
+        polygonInstances.push(newInstance);
+        drawSVGPolygon(newInstance);
+        updateLayersList();
+        selectPolygon(newInstance.id);
+    }
+});
+
+
+
+
+const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+svg.id = 'backgroundSVG';
+svg.style.position = 'fixed';
+svg.style.top = '0';
+svg.style.left = '0';
+svg.style.width = '100%';
+svg.style.height = '100%';
+svg.style.pointerEvents = 'none';
+svg.style.zIndex = '10';
+
+document.body.insertBefore(svg, document.body.firstChild);
+svg.addEventListener("contextmenu", (e) => e.preventDefault());
+
+const shape_button = document.getElementById("applyShapeSettings");
+
+var mouse_x = 0;
+var mouse_y = 0;
+
+
+function getCenter(points) {
+    let sumX = 0, sumY = 0;
+    for (let i = 0; i < points.length; i++) {
+        sumX += points[i][0];
+        sumY += points[i][1];
+    }
+    return [sumX / points.length, sumY / points.length];
+}
+
+
+function drawSVGPolygon(instance) {
+    const points = instance.points;
+    const xcord = instance.x;
+    const ycord = instance.y;
+    
+    // Remove old polygon element if it exists
+    const oldPolygon = document.getElementById(instance.id);
+    if (oldPolygon) {
+        oldPolygon.remove();
+    }
+
+    const polygonElement = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+
+    let pointsString = '';
+    const center = getCenter(points);
+
+    var scale = 1000;
+    for (let i = 0; i < points.length; i++) {
+        let px = (points[i][0] - center[0]);
+        let py = (points[i][1] - center[1]);
+
+        // Apply scale
+        px *= scale;
+        py *= scale;
+
+        // Apply rotation (in radians)
+        const rad = instance.angle * Math.PI / 180;
+
+        const rx = px * Math.cos(rad) - py * Math.sin(rad);
+        const ry = px * Math.sin(rad) + py * Math.cos(rad);
+
+        // Apply translation
+        const x = xcord + rx;
+        const y = ycord + ry;
+
+        pointsString += `${x},${y} `;
+    }
+    pointsString = pointsString.trim();
+    
+    polygonElement.setAttribute('id', instance.id);
+    polygonElement.setAttribute('points', pointsString);
+    polygonElement.setAttribute('fill', 'rgba(255, 0, 0, 0.5)');
+    polygonElement.setAttribute('stroke', 'red');
+    polygonElement.setAttribute('stroke-width', '2');
+    polygonElement.style.pointerEvents = 'auto';
+
+    svg.appendChild(polygonElement);
+    highlightSelectedPolygon();
+}
+
+// Function to redraw all polygons
+function redrawAllPolygons() {
+    polygonInstances.forEach(instance => {
+        drawSVGPolygon(instance);
+    });
+}
+
+
+let dragging = false;
+
+
+
+
+svg.addEventListener('mousedown', (e) => {
+    // Check if clicked element is a polygon
+    if (e.target.tagName === 'polygon' && e.button === 0) {
+        const polygonId = e.target.id;
+        draggingPolygon = polygonInstances.find(p => p.id === polygonId);
+        selectPolygon(polygonId);
+    }
+
+    
+
+    if (e.target.tagName === 'polygon' && e.button === 2) {
+
+        e.preventDefault();
+
+        const polygonId = e.target.id;
+
+        selectPolygon(polygonId);
+        shape_popup.style.left = (e.clientX + 15) + "px";
+        shape_popup.style.top = (e.clientY + 15) + "px";
+
+        shape_popup.style.display = "block";
+
+        document.getElementById("shapeXInput").value = selectedPolygon.x;
+        document.getElementById("shapeYInput").value = selectedPolygon.y;
+
+
+    }
+
+    
+    
+
+   
+    
+
+
+
+});
+
+
+window.addEventListener("mousedown", (e) => {
+ 
+    if (e.button !== 0) return;
+
+    const clickedPolygon = (e.target.tagName === "polygon");
+    const clickedPopup   = shape_popup.contains(e.target);
+    const clickedUI      =
+        e.target.closest(".layers-panel") ||
+        e.target.closest(".menu-bar");
+
+    if (!clickedPopup && !clickedPolygon && shape_popup.style.display === "block") {
+        shape_popup.style.display = "none";
+    }
+
+    if (!clickedPolygon && !clickedPopup && !clickedUI) {
+        selectPolygon(null);
+    }
+});
+
+
+
+
+
+shapeAngleSlider.addEventListener("input", () => {
+    if (!selectedPolygon) return;
+
+    selectedPolygon.angle = parseFloat(shapeAngleSlider.value);
+    drawSVGPolygon(selectedPolygon);
+});
+
+shape_button.addEventListener('click', function() {
+
+    if (!selectedPolygon) return;
+
+    selectedPolygon.x = parseFloat(document.getElementById("shapeXInput").value);
+    selectedPolygon.y = parseFloat(document.getElementById("shapeYInput").value);
+
+    drawSVGPolygon(selectedPolygon);
+
+});
+
+
+
+
+window.addEventListener('mouseup', () => {
+    draggingPolygon = null;
+});
+
+
+window.addEventListener('mousemove', (e) => {
+    if (draggingPolygon) {
+        // Update the position of the dragging polygon
+        draggingPolygon.x = e.clientX;
+        draggingPolygon.y = e.clientY;
+        drawSVGPolygon(draggingPolygon);
+    }
+});
+
+
+
+
+
+
+Create_button.addEventListener('click', function() {
+
+        popup.classList.add("slide-out");
+
+        setTimeout(() => {
+            popup.classList.remove("slide-out");  
+            popup.style.display = 'none';
+        }, 400);
+
+        
+        canvas = document.createElement('canvas');
+        canvas.width = parseInt(document.getElementById('width').value);
+        canvas.height = parseInt(document.getElementById('height').value);
+        document.body.appendChild(canvas);
+        ctx = canvas.getContext('2d');
+
+        canvas.style.border = '3px solid black';
+        canvas.style.display = 'block';
+        canvas.style.background = '#CBC3E3';
+        canvas.style.margin = '20px auto';
+        canvas.style.boxShadow = '0px 4px 8px rgba(0, 0, 0, 0.2)';
+
+    });
+
+    new_file.addEventListener('click', function() {
+        
+        popup.classList.add("slide-in");
+        popup.style.display = 'block'; 
+        
+    });
+
+
+
+    document.addEventListener('keydown', function(event) {
+        
+        if (event.key === 'Escape') {
+            
+            popup.classList.add("slide-out");
+            setTimeout(() => {
+            popup.classList.remove("slide-out");  
+            popup.style.display = 'none';
+            }, 400);
+        }
+
+
+        if (event.key === "Delete" && selectedPolygon) {
+            deletePolygon(selectedPolygon.id);
+            selectPolygon(null);
+            shape_popup.style.display = "none";
+        }
+
+
+    });
+
+
+
+
+
+  </script>
+
+
+</html>
