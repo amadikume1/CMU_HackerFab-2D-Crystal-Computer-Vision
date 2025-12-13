@@ -1,7 +1,8 @@
 # CMU_HackerFab-2D-Crystal-Computer-Vision
 
-A computer vision system for the **automatic identification, characterization, and enhancement** of 2D crystal samples in optical microscopy images.  
-This tool enables analysis of crystal samples by **detecting, denoising, classifying, and measuring** crystal properties from optical data — forming a key component of the Hacker Fab project’s automated flake detection and assembly pipeline.
+This repository contains a computer vision pipeline for automatic identification, enhancement, and characterization of 2D crystal flakes from optical microscopy images.
+It serves as the perception and data-extraction module of the CMU Hacker Fab 2D Crystal Stacking Robot, converting raw microscope images into structured, machine-readable flake data for downstream CAD design and robotic assembly.
+The pipeline emphasizes robust image preprocessing, interpretable feature extraction, and reproducible data storage, rather than black-box detection alone.
 
 ---
 
@@ -26,23 +27,31 @@ pip install -r requirements.txt
 
 ### Usage
 
-#### Baseline Pipeline
+#### Baseline + Feature Extraction Pipeline
 Run the main script with an input image:
 ```bash
 python run.py
 ```
 
+This performs:
+- image preprocessing and enhancement
+- mask generation and contour extraction
+- clustering-based noise filtering
+- feature extraction and database export
+
+Outputs:
 - The **denoised graphene images** will be saved in the `outputs/` directory.  
+- Sobel edge visualizations will be saved in `Sobel_vis_results/`.
+- Color segmentation + K-means visualizations will be saved in `Color_seg_kmeans/`.
 - Extracted **shape and texture features** will be saved in `Database/substrate_database`.  
 - To generate a searchable database of substrate features:
   ```bash
   python database_test.py
   ```
-  The database will be saved as `substrate.csv` in the `Database/` directory.
 
 ---
 
-#### Diffusion-Based Denoising Module (New)
+#### Diffusion-Based Denoising Module
 This project integrates an unsupervised **score-matching diffusion model** to enhance image quality before feature extraction and detection.  
 The implementation is adapted from [TheodoreChiYu/unsupervised_denoising_score_function](https://github.com/TheodoreChiYu/unsupervised_denoising_score_function).
 
@@ -58,24 +67,7 @@ python train.py --config configs/default.yaml
 python test.py --input data/sample_images/ --model checkpoints/model.pth
 ```
 
-This module effectively removes Poisson-Gaussian noise, enhances contrast, and preserves delicate substrate boundaries — directly improving downstream flake detection accuracy.
-
----
-
-### (In the Future) Neural Network Training
-
-Once sufficient labeled data is available, the next stage integrates **YOLOv8-based detection** and other neural models for substrate and flake identification.
-
-Example usage:
-```bash
-python train.py --config configs/default.yaml
-python test.py --input images/sample_images/ --model checkpoints/model.pth
-```
-
-Options can be listed with:
-```bash
---help
-```
+The denoising stage reduces Poisson-Gaussian microscope noise while preserving fine flake boundaries, enabling more stable contour extraction and improved downstream feature quality.
 
 ---
 
@@ -98,18 +90,24 @@ Options can be listed with:
 
 ---
 
-## Example Project Workflow
+## Project Workflow
 
 ```
 Raw Images (data/)
         ↓
-[Diffusion Denoising Module]
+Diffusion-Based Denoising
         ↓
-Processed Output (results/denoise/)
+Edge Enhancement (Sobel)
         ↓
-[Feature Extraction + Database Build]
+Mask Generation
         ↓
-Database/substrate_database/
+Contour Extraction
+        ↓
+K-Means Clustering (Noise vs Flakes)
+        ↓
+Feature Extraction (Geometry + Appearance)
+        ↓
+SQLite / CSV Database
 ```
 
 ---

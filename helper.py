@@ -6,13 +6,254 @@
 
 import cv2
 import numpy as np
+import json
 import os, time
 
 
 # ----------------------------------------------------------
 # Extract geometric and color features from a binary mask
 # ----------------------------------------------------------
-def extract_shape_features(binary_image, color_image=None):
+def extract_shape_features_old(binary_img, color_img, wafer_id, image_name=""):
+    features = []
+
+    h, w = binary_img.shape
+
+    # ===============================================================
+    # 1. CREATE A VERY LOOSE BINARY MASK (detect ANY non-black edge)
+    # ===============================================================
+    loose_bin = (binary_img > 100).astype(np.uint8) * 255
+
+    # Close gaps so contours are continuous
+    loose_bin = cv2.dilate(loose_bin, np.ones((3,3), np.uint8), 2)
+    loose_bin = cv2.medianBlur(loose_bin, 2)
+
+    # ===============================================================
+    # 2. FIND ALL OUTER CONTOURS
+    # ===============================================================
+    contours, _ = cv2.findContours(loose_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if len(contours) == 0:
+        print(f"[Warning] No contours detected at all for {image_name}")
+        save_stage(loose_bin, "Sobel_vis_results_new", image_name, "no_contours")
+        return []
+
+    # ===============================================================
+    # 3. REMOVE SUBSTRATE BORDER (TOUCHING IMAGE EDGE)
+    # ===============================================================
+    internal = []
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        peri = cv2.arcLength(cnt, closed=False)
+
+        # Skip tiny noise
+        if area < 200 or peri < 80:
+            continue
+
+        xs = cnt[:,0,0]
+        ys = cnt[:,0,1]
+
+        # Count how many contour points touch border
+        border_touch = (
+            (xs <= 1).sum() +
+            (xs >= w-2).sum() +
+            (ys <= 1).sum() +
+            (ys >= h-2).sum()
+        )
+
+        # Compute fraction touching border
+        frac_border = border_touch / len(cnt)
+
+        # Skip if MOST of the contour is on the border (substrate frame)
+        if frac_border > 0.30:        # << relaxed threshold (was: ANY)
+            continue
+
+        # This contour is valid graphene
+        internal.append(cnt)
+
+    if len(internal) == 0:
+        print(f"[Warning] No internal graphene contours for {image_name}")
+        save_stage(loose_bin, "Sobel_vis_results_new", image_name, "no_internal")
+        return []
+
+
+    # ===============================================================
+    # 4. SELECT THE LARGEST INTERNAL SHAPE
+    # ===============================================================
+    largest = max(internal, key=cv2.contourArea)
+
+    # ===============================================================
+    # 5. FILL IT
+    # ===============================================================
+    filled = np.zeros_like(binary_img)
+    cv2.drawContours(filled, [largest], -1, 255, -1)
+
+    save_stage(filled, "Sobel_vis_results_new", image_name, "filled_largest")
+
+    # ===============================================================
+    # 6. MIN-AREA RECTANGLE (4 CORNERS)
+    # ===============================================================
+    rect = cv2.minAreaRect(largest)
+    box = cv2.boxPoints(rect)
+    box = np.int32(box)
+    polygon_str = json.dumps(box.tolist())
+
+    # ===============================================================
+    # 7. GEOMETRIC + COLOR FEATURES
+    # ===============================================================
+    x, y, w0, h0 = cv2.boundingRect(largest)
+    M = cv2.moments(largest)
+    cx = M["m10"] / M["m00"]
+    cy = M["m01"] / M["m00"]
+
+    masked_color = cv2.mean(color_img, mask=filled)
+
+    feature = {
+        "Wafer_ID": wafer_id,
+        "Material": "Graphene",
+        "Shape": "Polygon",
+        "Size_Width": float(w0),
+        "Size_Height": float(h0),
+        "Color": f"({masked_color[0]:.1f},{masked_color[1]:.1f},{masked_color[2]:.1f})",
+        "Position_X": float(cx),
+        "Position_Y": float(cy),
+        "Polygon": polygon_str
+    }
+
+    features.append(feature)
+    return features
+
+import cv2
+import numpy as np
+import json
+
+def extract_shape_features(binary_img, color_img, wafer_id, image_name=""):
+    features = []
+    h, w = binary_img.shape
+
+    # ===============================================================
+    # 1. PREP: Convert to LAB and cluster colors
+    # ===============================================================
+    lab = cv2.cvtColor(color_img, cv2.COLOR_BGR2LAB)
+    Z = lab.reshape((-1, 3)).astype(np.float32)
+
+    K = 3
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
+    ret, label, center = cv2.kmeans(Z, K, None, criteria, 5, cv2.KMEANS_RANDOM_CENTERS)
+
+    centers = np.uint8(center)
+    labels = label.reshape((h, w))
+    L_vals = centers[:, 0]
+
+    # ===============================================================
+    # 2. DETECT BACKGROUND (largest cluster)
+    # ===============================================================
+    counts = np.bincount(labels.flatten(), minlength=K)
+    background_cluster = np.argmax(counts)
+    background_L = L_vals[background_cluster]
+
+    # ===============================================================
+    # 3. REMOVE BRIGHT CLUSTERS
+    # ===============================================================
+    BRIGHT_THRESHOLD = 10
+    bright_clusters = [i for i in range(K) if L_vals[i] > background_L + BRIGHT_THRESHOLD]
+
+    # ===============================================================
+    # 4. GRAPHENE CLUSTERS
+    # ===============================================================
+    graphene_clusters = [i for i in range(K) if i != background_cluster and i not in bright_clusters]
+
+    if len(graphene_clusters) == 0:
+        graphene_clusters = [int(np.argmin([L_vals[i] for i in range(K) if i != background_cluster]))]
+
+    # ===============================================================
+    # 5. BUILD GRAPHENE MASK
+    # ===============================================================
+    graphene_mask = np.zeros((h, w), dtype=np.uint8)
+    for gc in graphene_clusters:
+        graphene_mask[labels == gc] = 255
+
+    # ===============================================================
+    # 6. REMOVE NOISE WITHOUT MERGING SHAPES
+    # ===============================================================
+    # small kernel → preserves thin flakes
+    graphene_mask = cv2.medianBlur(graphene_mask, 3)
+
+    # remove tiny components manually
+    num_labels, cc_mask = cv2.connectedComponents(graphene_mask)
+    cleaned = np.zeros_like(graphene_mask)
+
+    for comp in range(1, num_labels):
+        region = (cc_mask == comp).astype(np.uint8)
+        area = region.sum()
+
+        if area > 600:    # keep small flakes but remove dust
+            cleaned[cc_mask == comp] = 255
+
+    graphene_mask = cleaned
+
+    # *** IMPORTANT FIX ***
+    # Replace aggressive close/open with LIGHT smoothing
+    graphene_mask = cv2.GaussianBlur(graphene_mask, (5,5), 0)
+
+    save_stage(graphene_mask, "color_seg_kmeans", image_name, "graphene_mask")
+
+    # ===============================================================
+    # 7. FIND GRAPHENE CONTOURS
+    # ===============================================================
+    contours, _ = cv2.findContours(graphene_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours = [c for c in contours if cv2.contourArea(c) > 1000]
+
+    if len(contours) == 0:
+        print(f"[Warning] No graphene detected for {image_name}")
+        save_stage(graphene_mask, "color_seg_kmeans", image_name, "no_graphene")
+        return []
+
+    # ===============================================================
+    # 8. SELECT LARGEST CONTOUR
+    # ===============================================================
+    largest = max(contours, key=cv2.contourArea)
+
+    # ===============================================================
+    # 9. FILL SHAPE
+    # ===============================================================
+    filled = np.zeros_like(graphene_mask)
+    cv2.drawContours(filled, [largest], -1, 255, -1)
+    save_stage(filled, "color_seg_kmeans", image_name, "filled_largest")
+
+    # ===============================================================
+    # 10. POLYGON + FEATURES
+    # ===============================================================
+    epsilon = 0.01 * cv2.arcLength(largest, True)
+    approx = cv2.approxPolyDP(largest, epsilon, True)
+    num_sides = len(approx)
+
+    rect = cv2.minAreaRect(largest)
+    box = np.int32(cv2.boxPoints(rect))
+    polygon_str = json.dumps(box.tolist())
+
+    x, y, w0, h0 = cv2.boundingRect(largest)
+    M = cv2.moments(largest)
+    cx = M["m10"] / M["m00"]
+    cy = M["m01"] / M["m00"]
+
+    masked_color = cv2.mean(color_img, mask=filled)
+
+    feature = {
+        "Wafer_ID": wafer_id,
+        "Material": "Graphene",
+        "Shape": f"{num_sides}-side polygon",
+        "Size_Width": float(w0),
+        "Size_Height": float(h0),
+        "Color": f"({masked_color[0]:.1f},{masked_color[1]:.1f},{masked_color[2]:.1f})",
+        "Position_X": float(cx),
+        "Position_Y": float(cy),
+        "Polygon": polygon_str
+    }
+
+    features.append(feature)
+    return features
+
+def extract_shape_features_new(binary_image, color_image=None, image_name=""):
     """
     Extract shape and color features from a binary (0/255) mask.
 
@@ -24,27 +265,22 @@ def extract_shape_features(binary_image, color_image=None):
         list[dict]: List of shape feature dictionaries, one per contour.
     """
 
-    # Find all external contours in the binary mask
     cnts, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     features = []
     for idx, cnt in enumerate(cnts):
-        # Calculate contour area; skip if non-positive
+
         area = cv2.contourArea(cnt)
         if area <= 0:
             continue
 
-        # Perimeter used for polygon approximation
         perimeter = cv2.arcLength(cnt, True)
-
-        # Bounding box and centroid (for location tracking)
         x, y, w, h = cv2.boundingRect(cnt)
         M = cv2.moments(cnt)
         cx = M["m10"] / M["m00"] if M["m00"] != 0 else x + w / 2
         cy = M["m01"] / M["m00"] if M["m00"] != 0 else y + h / 2
 
         # ---- Shape identification ----
-        # Approximate contour polygon and classify by number of sides
         approx = cv2.approxPolyDP(cnt, 0.04 * perimeter, True)
         sides = len(approx)
 
@@ -56,22 +292,20 @@ def extract_shape_features(binary_image, color_image=None):
         elif sides == 5:
             shape_name = "Pentagon"
         elif sides > 5:
-            shape_name = "Circle"
+            shape_name = f"{sides}-Polygon"
         else:
             shape_name = "Unknown"
 
         # ---- Optional color detection ----
         color_name = "Unknown"
         if color_image is not None:
-            # Create binary mask for current contour region
+            if color_image.shape[:2] != binary_image.shape[:2]:
+                color_image = cv2.resize(color_image, (binary_image.shape[1], binary_image.shape[0]))
             mask = np.zeros(binary_image.shape, dtype=np.uint8)
             cv2.drawContours(mask, [cnt], -1, 255, -1)
-
-            # Compute average BGR color within region
             mean_color = cv2.mean(color_image, mask=mask)[:3]
             b, g, r = mean_color
 
-            # Simple color labeling based on dominant channel
             if r > g and r > b:
                 color_name = "RED"
             elif g > r and g > b:
@@ -83,16 +317,28 @@ def extract_shape_features(binary_image, color_image=None):
             else:
                 color_name = "MIXED"
 
-        # Append extracted measurements into a feature dictionary
+        # ---- Polygon points ----
+        rect = cv2.minAreaRect(cnt)
+        box = cv2.boxPoints(rect)       # 4 corner points
+        box = np.int32(box)
+        polygon_str = json.dumps(box.tolist())  # save as JSON string
+
+        # draw box for visualization (optional)
+        cv2.drawContours(color_image, [box], 0, (0,255,0), 2)
+        save_stage(binary_image, "shape_features_sobel", f"{image_name}", f"binary_{idx+1}")
+        save_stage(color_image, "shape_features_sobel", f"{image_name}", f"boxed_{idx+1}")
+
+        # ---- Append everything ----
         features.append({
-            "Wafer_ID": f"Auto_{idx}",     # Placeholder wafer ID
-            "Material": "placeholder",     # Material can be updated later
+            "Wafer_ID": f"{image_name}_shape{idx+1}",
+            "Material": "Graphene",
             "Shape": shape_name,
             "Size_Width": float(w),
             "Size_Height": float(h),
             "Color": color_name,
             "Position_X": float(cx),
-            "Position_Y": float(cy)
+            "Position_Y": float(cy),
+            "Polygon": polygon_str
         })
 
     return features
@@ -114,8 +360,7 @@ def save_stage(img, out_dir, stem, stage_name):
     Save an image output with timestamp and stage label.
     """
     ensure_dir(out_dir)
-    ts = time.strftime("%Y%m%d_%H%M%S")  # Timestamp for file naming
-    fname = f"{stem}__{stage_name}_{ts}.png"
+    fname = f"{stem}__{stage_name}.png"
     fp = os.path.join(out_dir, fname)
     cv2.imwrite(fp, img)
     print(f"[saved] {stage_name} -> {fp}")

@@ -1,52 +1,23 @@
 import sqlite3 as sq
 import csv
-database = sq.connect("Database/substrate_database")
 
+# Connect to your existing database
+database = sq.connect("Database/substrate_sobel_new.db")
 cursor = database.cursor()
 
-# Will interpret data as basic list.
-
-information = [["Wafer1", "Graphene", "Triangle", 10, 10, "GREEN", 150, 180],
-               ["Wafer2", "Graphene", "Square", 15, 10, "GREEN", 150, 180]]
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS substrate (
-               
-               id INTEGER PRIMARY KEY AUTOINCREMENT,
-               Wafer_ID TEXT,
-               Material TEXT,
-               Shape TEXT,
-               Size_Width REAL,
-               Size_Height REAL,
-               Color TEXT,
-               Position_X REAL,
-               Position_Y REAL
-
-               )'''
-    )
-
-
-
-for entry in information:
-    cursor.execute(f"INSERT INTO substrate (Wafer_ID, Material, Shape, Size_Width, Size_Height, Color, Position_X, Position_Y) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (entry[0],entry[1], entry[2], entry[3], entry[4],entry[5], entry[6], entry[7],))
-
-
-cursor.execute("SELECT * FROM substrate")
+# Read entire table INCLUDING id, Wafer_ID, Material, Shape, etc.
+cursor.execute("SELECT * FROM substrate_sobel_new")
 rows = cursor.fetchall()
 
-header = []
+# Extract column names (these will be exactly the 9 columns you listed)
+header = [col[0] for col in cursor.description]
 
-for head in cursor.description:
-    # print(head)
-    header.append(head[0])
+# Export to CSV
+with open("Database/substrate_sobel_new.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(header)   # writes the columns
+    writer.writerows(rows)    # writes the data
 
-with open('Database/substrate.csv', 'w', newline='') as f:
-
-    write = csv.writer(f)
-
-    write.writerow(header)
-
-    write.writerows(rows)
-
-# Print each row
+# Print rows for confirmation
 for row in rows:
     print(row)

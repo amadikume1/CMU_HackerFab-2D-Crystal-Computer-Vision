@@ -1,9 +1,6 @@
 id,Wafer_ID,Material,Shape,Size_Width,Size_Height,Color,Position_X,Position_Y
-1,Auto_0,placeholder,Square,3.0,3.0,Unknown,286.0,408.0
-2,Auto_1,placeholder,Circle,11.0,16.0,Unknown,251.61818181818182,378.56161616161614
-3,Auto_2,placeholder,Pentagon,5.0,6.0,Unknown,226.94949494949495,342.7474747474747
-4,Auto_0,placeholder,Square,3.0,3.0,GREEN,286.0,408.0
-5,Auto_1,placeholder,Circle,11.0,16.0,GREEN,251.61818181818182,378.56161616161614
-6,Auto_2,placeholder,Pentagon,5.0,6.0,GREEN,226.94949494949495,342.7474747474747
-7,Wafer1,Graphene,Triangle,10.0,10.0,GREEN,150.0,180.0
-8,Wafer2,Graphene,Square,15.0,10.0,GREEN,150.0,180.0
+1,Auto_0,placeholder,Square,416.0,416.0,GREEN,207.5,207.5
+2,Auto_0,placeholder,Rectangle,2040.0,1086.0,GREEN,1019.5,542.5
+3,Auto_0,placeholder,Rectangle,900.0,700.0,GREEN,449.5,349.5
+4,Wafer1,Graphene,Triangle,10.0,10.0,GREEN,150.0,180.0
+5,Wafer2,Graphene,Square,15.0,10.0,GREEN,150.0,180.0
